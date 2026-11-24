@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home-Cooked Marketplace</title>
+    <style>
+        body {
+            background: #FFF9F2;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #2D4934;
+        }
+        .card {
+            background: white;
+            padding: 35px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            margin: 20px;
+            box-shadow: 0 4px 20px #00000010;
+        }
+        .emoji {
+            font-size: 60px;
+        }
+        p {
+            color: #555;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="emoji">🍽️</div>
+        <h1>Home-Cooked Marketplace</h1>
+        <h2 id="status">Email Confirmation</h2>
+        <p id="message">
+            Please return to the Home-Cooked Marketplace
+            app and log in to your account.
+        </p>
+    </div>
+    <script>
+        const params = new URLSearchParams(
+            window.location.hash.slice(1)
+        );
+        const query = new URLSearchParams(
+            window.location.search
+        );
+
+        if (params.has('error') || query.has('error')) {
+            document.getElementById('status').textContent =
+                'Confirmation Failed';
+            document.getElementById('message').textContent =
+                'Please request a new confirmation email.';
+        } else if (
+            params.has('access_token') &&
+            params.get('type') === 'signup'
+        ) {
+            document.getElementById('status').textContent =
+                'Email Confirmed!';
+        }
+
+        history.replaceState(null, '', window.location.pathname);
+    </script>
+</body>
+</html>
