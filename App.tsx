@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   StyleSheet,
+  Image,
   TextInput,
   Alert,
   Switch,
@@ -11,6 +12,8 @@ import {
   ScrollView,
   SafeAreaView,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './utils/supabase';
@@ -69,15 +72,17 @@ export default function App() {
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [isCook, setIsCook] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [profileReady, setProfileReady] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
-        setSession(nextSession);
-        setReady(true);
-      }
-    );
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange(
+        (_event, nextSession) => {
+          setSession(nextSession);
+          setReady(true);
+        }
+      );
 
     return () => subscription.unsubscribe();
   }, []);
@@ -88,6 +93,7 @@ export default function App() {
     let active = true;
 
     setProfileReady(false);
+    setAvatarUrl('');
     setFullName('');
     setBio('');
     setLocation('');
@@ -96,7 +102,7 @@ export default function App() {
     if (userId) {
       supabase
         .from('profiles')
-        .select('full_name,bio,location,is_cook')
+        .select('full_name,bio,location,is_cook,avatar_url')
         .eq('id', userId)
         .maybeSingle()
         .then(({ data, error }) => {
@@ -107,6 +113,7 @@ export default function App() {
             return;
           }
 
+          setAvatarUrl(data?.avatar_url ?? '');
           setFullName(data?.full_name ?? '');
           setBio(data?.bio ?? '');
           setLocation(data?.location ?? '');
@@ -155,7 +162,90 @@ export default function App() {
     } catch (error) {
       Alert.alert(
         'Authentication error',
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error
+          ? error.message
+          : String((error as { message?: string })?.message ?? error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function chooseProfilePicture() {
+    if (!userId || !profileReady || busy) return;
+
+    setBusy(true);
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+        base64: true,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+
+      if (!asset.base64) {
+        throw new Error('Could not read the selected image.');
+      }
+
+      const bytes = decode(asset.base64);
+
+      if (bytes.byteLength > 5 * 1024 * 1024) {
+        throw new Error('Please choose an image smaller than 5 MB.');
+      }
+
+      const path = `${userId}/avatar-${Date.now()}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, bytes, {
+          contentType: 'image/jpeg',
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(path);
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          avatar_url: data.publicUrl,
+        });
+
+      if (profileError) {
+        await supabase.storage
+          .from('avatars')
+          .remove([path]);
+
+        throw profileError;
+      }
+
+      setAvatarUrl(data.publicUrl);
+
+      const prefix = '/storage/v1/object/public/avatars/';
+      const oldPath = avatarUrl.split(prefix)[1];
+
+      if (oldPath && oldPath.startsWith(`${userId}/`)) {
+        await supabase.storage
+          .from('avatars')
+          .remove([oldPath]);
+      }
+
+      Alert.alert('Profile picture saved');
+    } catch (error) {
+      Alert.alert(
+        'Picture upload failed',
+        error instanceof Error
+          ? error.message
+          : String((error as { message?: string })?.message ?? error)
       );
     } finally {
       setBusy(false);
@@ -163,7 +253,7 @@ export default function App() {
   }
 
   async function saveProfile() {
-    if (!userId || !profileReady) return;
+    if (!userId || !profileReady || busy) return;
 
     setBusy(true);
 
@@ -185,7 +275,9 @@ export default function App() {
     } catch (error) {
       Alert.alert(
         'Save failed',
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error
+          ? error.message
+          : String((error as { message?: string })?.message ?? error)
       );
     } finally {
       setBusy(false);
@@ -204,7 +296,9 @@ export default function App() {
     } catch (error) {
       Alert.alert(
         'Logout failed',
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error
+          ? error.message
+          : String((error as { message?: string })?.message ?? error)
       );
     } finally {
       setBusy(false);
@@ -317,6 +411,7 @@ export default function App() {
         >
           <TouchableOpacity
             style={styles.backButton}
+            disabled={busy}
             onPress={() => setCurrentScreen('home')}
           >
             <Text style={styles.backButtonText}>
@@ -331,6 +426,47 @@ export default function App() {
           <Text style={styles.subtitle}>
             {session?.user.email}
           </Text>
+
+          {profileReady && (
+            <View style={styles.avatarSection}>
+              {avatarUrl ? (
+                <Image
+                  source={{ uri: avatarUrl }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.avatar,
+                    styles.avatarPlaceholder,
+                  ]}
+                >
+                  <Text style={styles.avatarInitial}>
+                    {(fullName.trim() ||
+                      session?.user.email ||
+                      'U')
+                      .charAt(0)
+                      .toUpperCase()}
+                  </Text>
+                </View>
+              )}
+
+              {editing && (
+                <TouchableOpacity
+                  disabled={busy}
+                  onPress={chooseProfilePicture}
+                >
+                  <Text style={styles.avatarButton}>
+                    {busy
+                      ? 'Please wait...'
+                      : avatarUrl
+                      ? 'Change Profile Picture'
+                      : 'Add Profile Picture'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {!profileReady ? (
             <Text style={styles.noticeText}>
@@ -391,7 +527,7 @@ export default function App() {
                 onPress={saveProfile}
               >
                 <Text style={styles.buttonText}>
-                  {busy ? 'Saving...' : 'Save Profile'}
+                  {busy ? 'Please wait...' : 'Save Profile'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -427,6 +563,7 @@ export default function App() {
 
               <TouchableOpacity
                 style={styles.button}
+                disabled={busy}
                 onPress={() =>
                   setCurrentScreen('edit-profile')
                 }
@@ -698,6 +835,31 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E3EAE3',
+  },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: 44,
+    fontWeight: 'bold',
+    color: '#2D4934',
+  },
+  avatarButton: {
+    marginTop: 14,
+    color: '#2D4934',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
