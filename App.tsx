@@ -1,7 +1,10 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   StyleSheet,
+  TextInput,
+  Alert,
+  Switch,
+  ActivityIndicator,
   Text,
   View,
   TouchableOpacity,
@@ -9,6 +12,8 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from './utils/supabase';
 
 const meals = [
   {
@@ -55,6 +60,397 @@ const meals = [
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
+  const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [bio, setBio] = useState('');
+  const [location, setLocation] = useState('');
+  const [isCook, setIsCook] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        setSession(nextSession);
+        setReady(true);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const userId = session?.user.id;
+
+  useEffect(() => {
+    let active = true;
+
+    setProfileReady(false);
+    setFullName('');
+    setBio('');
+    setLocation('');
+    setIsCook(false);
+
+    if (userId) {
+      supabase
+        .from('profiles')
+        .select('full_name,bio,location,is_cook')
+        .eq('id', userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!active) return;
+
+          if (error) {
+            Alert.alert('Profile error', error.message);
+            return;
+          }
+
+          setFullName(data?.full_name ?? '');
+          setBio(data?.bio ?? '');
+          setLocation(data?.location ?? '');
+          setIsCook(data?.is_cook ?? false);
+          setProfileReady(true);
+        });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  async function authenticate(signUp: boolean) {
+    if (!email.trim() || !password) {
+      Alert.alert('Enter your email and password');
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const credentials = {
+        email: email.trim(),
+        password,
+      };
+
+      const { data, error } = signUp
+        ? await supabase.auth.signUp(credentials)
+        : await supabase.auth.signInWithPassword(credentials);
+
+      if (error) throw error;
+
+      setPassword('');
+
+      if (signUp && !data.session) {
+        Alert.alert(
+          'Check your email',
+          'Confirm your email address, then return here to log in.'
+        );
+
+        setCurrentScreen('login');
+      } else {
+        setCurrentScreen('profile');
+      }
+    } catch (error) {
+      Alert.alert(
+        'Authentication error',
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveProfile() {
+    if (!userId || !profileReady) return;
+
+    setBusy(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          full_name: fullName.trim(),
+          bio,
+          location,
+          is_cook: isCook,
+        });
+
+      if (error) throw error;
+
+      Alert.alert('Profile saved');
+      setCurrentScreen('profile');
+    } catch (error) {
+      Alert.alert(
+        'Save failed',
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    setBusy(true);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) throw error;
+
+      setCurrentScreen('home');
+    } catch (error) {
+      Alert.alert(
+        'Logout failed',
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.homeContent}>
+        <ActivityIndicator />
+      </SafeAreaView>
+    );
+  }
+
+  if (
+    currentScreen === 'login' ||
+    currentScreen === 'signup' ||
+    (
+      (currentScreen === 'profile' ||
+        currentScreen === 'edit-profile') &&
+      !session
+    )
+  ) {
+    const signUp = currentScreen === 'signup';
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+
+        <ScrollView
+          contentContainerStyle={styles.detailsContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setCurrentScreen('home')}
+          >
+            <Text style={styles.backButtonText}>
+              Back to Home
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>
+            {signUp ? 'Create Account' : 'Log In'}
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+
+          <TouchableOpacity
+            style={styles.button}
+            disabled={busy}
+            onPress={() => authenticate(signUp)}
+          >
+            <Text style={styles.buttonText}>
+              {busy
+                ? 'Please wait...'
+                : signUp
+                ? 'Create Account'
+                : 'Log In'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            disabled={busy}
+            onPress={() =>
+              setCurrentScreen(signUp ? 'login' : 'signup')
+            }
+          >
+            <Text style={styles.secondaryButtonText}>
+              {signUp
+                ? 'Already have an account? Log In'
+                : 'New here? Create Account'}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (
+    currentScreen === 'profile' ||
+    currentScreen === 'edit-profile'
+  ) {
+    const editing = currentScreen === 'edit-profile';
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+
+        <ScrollView
+          contentContainerStyle={styles.detailsContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setCurrentScreen('home')}
+          >
+            <Text style={styles.backButtonText}>
+              Back to Home
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>
+            {editing ? 'Edit Profile' : 'My Profile'}
+          </Text>
+
+          <Text style={styles.subtitle}>
+            {session?.user.email}
+          </Text>
+
+          {!profileReady ? (
+            <Text style={styles.noticeText}>
+              Profile not loaded. If loading failed,
+              log out and try again.
+            </Text>
+          ) : editing ? (
+            <View style={styles.card}>
+              <Text style={styles.detailLabel}>
+                Full Name
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Your name"
+              />
+
+              <Text style={styles.detailLabel}>
+                Bio
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Tell us about yourself"
+                multiline
+              />
+
+              <Text style={styles.detailLabel}>
+                Location
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={location}
+                onChangeText={setLocation}
+                placeholder="City"
+              />
+
+              <Text style={styles.detailLabel}>
+                I am a home cook
+              </Text>
+
+              <Switch
+                value={isCook}
+                onValueChange={setIsCook}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  { marginTop: 20 },
+                ]}
+                disabled={busy}
+                onPress={saveProfile}
+              >
+                <Text style={styles.buttonText}>
+                  {busy ? 'Saving...' : 'Save Profile'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>
+                {fullName || 'Your Profile'}
+              </Text>
+
+              <Text style={styles.detailLabel}>
+                Bio
+              </Text>
+
+              <Text style={styles.detailValue}>
+                {bio || 'Not added yet'}
+              </Text>
+
+              <Text style={styles.detailLabel}>
+                Location
+              </Text>
+
+              <Text style={styles.detailValue}>
+                {location || 'Not added yet'}
+              </Text>
+
+              <Text style={styles.detailLabel}>
+                Account Type
+              </Text>
+
+              <Text style={styles.detailValue}>
+                {isCook ? 'Home Cook' : 'Customer'}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() =>
+                  setCurrentScreen('edit-profile')
+                }
+              >
+                <Text style={styles.buttonText}>
+                  Edit Profile
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            disabled={busy}
+            onPress={logout}
+          >
+            <Text style={styles.secondaryButtonText}>
+              Log Out
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   if (currentScreen === 'meals') {
     return (
@@ -69,21 +465,31 @@ export default function App() {
             style={styles.backButton}
             onPress={() => setCurrentScreen('home')}
           >
-            <Text style={styles.backButtonText}>Back to Home</Text>
+            <Text style={styles.backButtonText}>
+              Back to Home
+            </Text>
           </TouchableOpacity>
 
-          <Text style={styles.title}>Explore Homemade Meals</Text>
-
-          <Text style={styles.subtitle}>
-            Discover fresh, delicious meals prepared by home cooks in your community.
+          <Text style={styles.title}>
+            Explore Homemade Meals
           </Text>
 
-          <Text style={styles.sectionTitle}>Available Meals</Text>
+          <Text style={styles.subtitle}>
+            Discover fresh, delicious meals prepared by
+            home cooks in your community.
+          </Text>
+
+          <Text style={styles.sectionTitle}>
+            Available Meals
+          </Text>
 
           {meals.map((meal) => (
             <View key={meal.id} style={styles.mealCard}>
               <View style={styles.mealHeader}>
-                <Text style={styles.mealName}>{meal.name}</Text>
+                <Text style={styles.mealName}>
+                  {meal.name}
+                </Text>
+
                 <Text style={styles.mealPrice}>
                   ${meal.price.toFixed(2)}
                 </Text>
@@ -103,7 +509,9 @@ export default function App() {
 
               <TouchableOpacity
                 style={styles.viewButton}
-                onPress={() => setCurrentScreen(`meal-${meal.id}`)}
+                onPress={() =>
+                  setCurrentScreen(`meal-${meal.id}`)
+                }
               >
                 <Text style={styles.viewButtonText}>
                   View Details
@@ -117,8 +525,13 @@ export default function App() {
   }
 
   if (currentScreen.startsWith('meal-')) {
-    const mealId = Number(currentScreen.replace('meal-', ''));
-    const selectedMeal = meals.find((meal) => meal.id === mealId);
+    const mealId = Number(
+      currentScreen.replace('meal-', '')
+    );
+
+    const selectedMeal = meals.find(
+      (meal) => meal.id === mealId
+    );
 
     if (selectedMeal) {
       return (
@@ -142,22 +555,34 @@ export default function App() {
             </Text>
 
             <View style={styles.card}>
-              <Text style={styles.detailLabel}>Price</Text>
+              <Text style={styles.detailLabel}>
+                Price
+              </Text>
+
               <Text style={styles.detailValue}>
                 ${selectedMeal.price.toFixed(2)}
               </Text>
 
-              <Text style={styles.detailLabel}>Category</Text>
+              <Text style={styles.detailLabel}>
+                Category
+              </Text>
+
               <Text style={styles.detailValue}>
                 {selectedMeal.category}
               </Text>
 
-              <Text style={styles.detailLabel}>Description</Text>
+              <Text style={styles.detailLabel}>
+                Description
+              </Text>
+
               <Text style={styles.detailValue}>
                 {selectedMeal.description}
               </Text>
 
-              <Text style={styles.detailLabel}>Home Cook</Text>
+              <Text style={styles.detailLabel}>
+                Home Cook
+              </Text>
+
               <Text style={styles.detailValue}>
                 {selectedMeal.cook}
               </Text>
@@ -183,7 +608,8 @@ export default function App() {
           </Text>
 
           <Text style={styles.subtitle}>
-            Share your homemade meals with people in your community and earn additional income.
+            Share your homemade meals with people in
+            your community and earn additional income.
           </Text>
 
           <View style={styles.card}>
@@ -192,7 +618,9 @@ export default function App() {
             </Text>
 
             <Text style={styles.cardText}>
-              Soon, home cooks will be able to create profiles, list homemade dishes, and connect with customers.
+              Soon, home cooks will be able to create
+              profiles, list homemade dishes, and
+              connect with customers.
             </Text>
           </View>
 
@@ -219,14 +647,18 @@ export default function App() {
         </Text>
 
         <Text style={styles.subtitle}>
-          Discover delicious homemade meals from local home cooks.
+          Discover delicious homemade meals from
+          local home cooks.
         </Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome!</Text>
+          <Text style={styles.cardTitle}>
+            Welcome!
+          </Text>
 
           <Text style={styles.cardText}>
-            Find homemade meals or share your cooking with your community.
+            Find homemade meals or share your cooking
+            with your community.
           </Text>
         </View>
 
@@ -236,6 +668,19 @@ export default function App() {
         >
           <Text style={styles.buttonText}>
             Explore Meals
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() =>
+            setCurrentScreen(session ? 'profile' : 'login')
+          }
+        >
+          <Text style={styles.buttonText}>
+            {session
+              ? 'My Profile'
+              : 'Log In / Create Account'}
           </Text>
         </TouchableOpacity>
 
@@ -253,6 +698,16 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D5DDD5',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#2D4934',
+    marginBottom: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFF9F2',
