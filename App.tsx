@@ -1,16 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import {
-  StyleSheet,
-  Image,
-  TextInput,
-  Alert,
-  Switch,
-  ActivityIndicator,
-  Text,
-  View,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
+  StyleSheet, Image, TextInput, Alert, Switch,
+  ActivityIndicator, Text, View, TouchableOpacity,
+  ScrollView, SafeAreaView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
@@ -52,11 +45,8 @@ type ButtonProps = {
 };
 
 function Button({
-  label,
-  onPress,
-  secondary = false,
-  danger = false,
-  disabled = false,
+  label, onPress, secondary = false,
+  danger = false, disabled = false,
 }: ButtonProps) {
   return (
     <TouchableOpacity
@@ -69,23 +59,18 @@ function Button({
       onPress={onPress}
       disabled={disabled}
     >
-      <Text
-        style={[
-          styles.buttonText,
-          secondary && styles.secondaryButtonText,
-          danger && styles.dangerButtonText,
-        ]}
-      >
+      <Text style={[
+        styles.buttonText,
+        secondary && styles.secondaryButtonText,
+        danger && styles.dangerButtonText,
+      ]}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-function Field({
-  label,
-  value,
-}: {
+function Field({ label, value }: {
   label: string;
   value: string;
 }) {
@@ -104,74 +89,57 @@ function money(value: number) {
 function errorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : String(
-        (error as { message?: string })?.message ?? error
-      );
+    : String((error as { message?: string })?.message ?? error);
 }
 
+const RECOVERY_URL =
+  'https://operatedocean.github.io/home-cooked-marketplace/';
+
 export default function App() {
-  const [currentScreen, setCurrentScreen] =
-    useState('home');
-
-  const [session, setSession] =
-    useState<Session | null>(null);
-
+  const [currentScreen, setCurrentScreen] = useState('home');
+  const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Authentication and profiles
+  // Authentication
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Profile
+
   const [fullName, setFullName] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [isCook, setIsCook] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [profileReady, setProfileReady] =
-    useState(false);
+  const [profileReady, setProfileReady] = useState(false);
 
   // Food listings
 
-  const [listings, setListings] =
-    useState<Listing[]>([]);
-
-  const [listingError, setListingError] =
-    useState('');
-
-  const [loadingListings, setLoadingListings] =
-    useState(false);
-
-  const [editingId, setEditingId] =
-    useState<string | null>(null);
-
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [listingError, setListingError] = useState('');
+  const [loadingListings, setLoadingListings] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [mealTitle, setMealTitle] = useState('');
-  const [mealDescription, setMealDescription] =
-    useState('');
-
+  const [mealDescription, setMealDescription] = useState('');
   const [mealPrice, setMealPrice] = useState('');
-  const [mealPortions, setMealPortions] =
-    useState('');
-
-  const [mealLocation, setMealLocation] =
-    useState('');
-
+  const [mealPortions, setMealPortions] = useState('');
+  const [mealLocation, setMealLocation] = useState('');
   const [mealImage, setMealImage] = useState('');
   const [mealBase64, setMealBase64] = useState('');
   const [available, setAvailable] = useState(true);
+  const [detailsBack, setDetailsBack] = useState('meals');
 
-  const [detailsBack, setDetailsBack] =
-    useState('meals');
-
-  // Customer orders
+  // Orders
 
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loadingOrders, setLoadingOrders] =
-    useState(false);
-
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [quantity, setQuantity] = useState(1);
-
   const [selectedListing, setSelectedListing] =
     useState<Listing | null>(null);
 
@@ -192,7 +160,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load user profile
+  // Load persistent user profile
 
   useEffect(() => {
     let active = true;
@@ -206,6 +174,9 @@ export default function App() {
     setListings([]);
     setOrders([]);
     setSelectedListing(null);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
 
     if (userId) {
       supabase
@@ -235,8 +206,6 @@ export default function App() {
     };
   }, [userId]);
 
-  // Refresh screens when opened
-
   useEffect(() => {
     if (!userId) return;
 
@@ -255,9 +224,11 @@ export default function App() {
     }
   }, [currentScreen, userId]);
 
-  // Authentication
+  // Login and registration
 
   async function authenticate(signUp: boolean) {
+    if (busy) return;
+
     if (!email.trim() || !password) {
       Alert.alert('Enter your email and password');
       return;
@@ -273,9 +244,7 @@ export default function App() {
 
       const { data, error } = signUp
         ? await supabase.auth.signUp(credentials)
-        : await supabase.auth.signInWithPassword(
-            credentials
-          );
+        : await supabase.auth.signInWithPassword(credentials);
 
       if (error) throw error;
 
@@ -286,20 +255,122 @@ export default function App() {
           'Check your email',
           'Confirm your email address before logging in.'
         );
-
         setCurrentScreen('login');
       } else {
         setCurrentScreen('profile');
       }
     } catch (error) {
-      Alert.alert(
-        'Authentication error',
-        errorMessage(error)
-      );
+      Alert.alert('Authentication error', errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
+
+  // Forgot password
+
+  async function resetPassword() {
+    if (busy) return;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      Alert.alert('Enter a valid email address');
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const { error } =
+        await supabase.auth.resetPasswordForEmail(
+          email.trim(),
+          { redirectTo: RECOVERY_URL }
+        );
+
+      if (error) throw error;
+
+      setPassword('');
+      setCurrentScreen('login');
+
+      Alert.alert(
+        'Check Your Email',
+        'If an account exists with this email address, you will receive a password reset link.'
+      );
+    } catch (error) {
+      Alert.alert('Password Reset Failed', errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Change password
+
+  function clearPasswordFields() {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  }
+
+  async function changePassword() {
+    if (busy || !session?.user.email) return;
+
+    if (!currentPassword) {
+      Alert.alert('Enter your current password');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      Alert.alert(
+        'Password Too Short',
+        'Your new password must contain at least 8 characters.'
+      );
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords Do Not Match');
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      Alert.alert('Choose a different password');
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const { data, error: verificationError } =
+        await supabase.auth.signInWithPassword({
+          email: session.user.email,
+          password: currentPassword,
+        });
+
+      if (verificationError) throw verificationError;
+
+      if (data.user?.id !== session.user.id) {
+        throw new Error('Account verification failed.');
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      clearPasswordFields();
+      setCurrentScreen('profile');
+
+      Alert.alert(
+        'Password Changed!',
+        'Your password has been successfully updated.'
+      );
+    } catch (error) {
+      Alert.alert('Password Change Failed', errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Logout
 
   async function logout() {
     if (busy) return;
@@ -317,6 +388,7 @@ export default function App() {
       setMealImage('');
       setMealBase64('');
       setPassword('');
+      clearPasswordFields();
       setCurrentScreen('home');
     } catch (error) {
       Alert.alert('Logout failed', errorMessage(error));
@@ -380,13 +452,10 @@ export default function App() {
       const bytes = decode(asset.base64);
 
       if (bytes.byteLength > 5 * 1024 * 1024) {
-        throw new Error(
-          'Please choose an image smaller than 5 MB.'
-        );
+        throw new Error('Please choose an image smaller than 5 MB.');
       }
 
-      const path =
-        `${userId}/avatar-${Date.now()}.jpg`;
+      const path = `${userId}/avatar-${Date.now()}.jpg`;
 
       const { error: uploadError } =
         await supabase.storage
@@ -409,10 +478,7 @@ export default function App() {
         });
 
       if (profileError) {
-        await supabase.storage
-          .from('avatars')
-          .remove([path]);
-
+        await supabase.storage.from('avatars').remove([path]);
         throw profileError;
       }
 
@@ -423,23 +489,18 @@ export default function App() {
       setAvatarUrl(data.publicUrl);
 
       if (oldPath?.startsWith(`${userId}/`)) {
-        await supabase.storage
-          .from('avatars')
-          .remove([oldPath]);
+        await supabase.storage.from('avatars').remove([oldPath]);
       }
 
       Alert.alert('Profile picture saved');
     } catch (error) {
-      Alert.alert(
-        'Picture upload failed',
-        errorMessage(error)
-      );
+      Alert.alert('Picture upload failed', errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
-  // Load food listings
+  // Food listings
 
   async function loadListings() {
     if (!userId) return;
@@ -500,13 +561,8 @@ export default function App() {
         throw new Error('Could not read image.');
       }
 
-      if (
-        decode(asset.base64).byteLength >
-        5 * 1024 * 1024
-      ) {
-        throw new Error(
-          'Please choose an image smaller than 5 MB.'
-        );
+      if (decode(asset.base64).byteLength > 5 * 1024 * 1024) {
+        throw new Error('Please choose an image smaller than 5 MB.');
       }
 
       setMealImage(asset.uri);
@@ -519,9 +575,7 @@ export default function App() {
   }
 
   async function saveListing() {
-    if (!userId || !profileReady || !isCook || busy) {
-      return;
-    }
+    if (!userId || !profileReady || !isCook || busy) return;
 
     const price = Number(mealPrice);
     const portions = Number(mealPortions);
@@ -545,12 +599,10 @@ export default function App() {
         'Check your listing',
         'Enter a valid meal name, description, price, location, and number of portions.'
       );
-
       return;
     }
 
     setBusy(true);
-
     let uploadedPath = '';
 
     try {
@@ -561,8 +613,7 @@ export default function App() {
       );
 
       if (mealBase64) {
-        const path =
-          `${userId}/meal-${Date.now()}.jpg`;
+        const path = `${userId}/meal-${Date.now()}.jpg`;
 
         const { error } = await supabase.storage
           .from('food-images')
@@ -596,13 +647,9 @@ export default function App() {
             .update(values)
             .eq('id', editingId)
             .eq('cook_id', userId)
-        : supabase
-            .from('listings')
-            .insert(values);
+        : supabase.from('listings').insert(values);
 
-      const { error } = await query
-        .select('id')
-        .single();
+      const { error } = await query.select('id').single();
 
       if (error) throw error;
 
@@ -646,32 +693,25 @@ export default function App() {
       'Delete listing?',
       `Are you sure you want to delete ${item.title}?`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            if (
-              !userId ||
-              item.cook_id !== userId ||
-              busy
-            ) {
-              return;
-            }
+            if (!userId || item.cook_id !== userId || busy) return;
 
             setBusy(true);
 
             try {
-              const { data: activeOrders, error: orderCheckError } =
-                await supabase
-                  .from('orders')
-                  .select('id')
-                  .eq('listing_id', item.id)
-                  .in('status', ['pending', 'accepted'])
-                  .limit(1);
+              const {
+                data: activeOrders,
+                error: orderCheckError,
+              } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('listing_id', item.id)
+                .in('status', ['pending', 'accepted'])
+                .limit(1);
 
               if (orderCheckError) throw orderCheckError;
 
@@ -709,10 +749,7 @@ export default function App() {
 
               Alert.alert('Listing deleted');
             } catch (error) {
-              Alert.alert(
-                'Delete failed',
-                errorMessage(error)
-              );
+              Alert.alert('Delete failed', errorMessage(error));
             } finally {
               setBusy(false);
             }
@@ -778,13 +815,10 @@ export default function App() {
     setBusy(true);
 
     try {
-      const { error } = await supabase.rpc(
-        'place_order',
-        {
-          p_listing_id: selectedListing.id,
-          p_quantity: quantity,
-        }
-      );
+      const { error } = await supabase.rpc('place_order', {
+        p_listing_id: selectedListing.id,
+        p_quantity: quantity,
+      });
 
       if (error) throw error;
 
@@ -797,10 +831,7 @@ export default function App() {
         'Your order has been sent to the home cook. No payment has been collected.'
       );
     } catch (error) {
-      Alert.alert(
-        'Order failed',
-        errorMessage(error)
-      );
+      Alert.alert('Order failed', errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -815,15 +846,10 @@ export default function App() {
         selectedListing.price * quantity
       )}\n\nNo online payment will be collected.`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm Order',
-          onPress: () => {
-            void placeOrder();
-          },
+          onPress: () => { void placeOrder(); },
         },
       ]
     );
@@ -850,32 +876,20 @@ export default function App() {
 
       await loadOrders();
 
-      Alert.alert(
-        'Order updated',
-        `Order status: ${status}`
-      );
+      Alert.alert('Order updated', `Order status: ${status}`);
     } catch (error) {
-      Alert.alert(
-        'Update failed',
-        errorMessage(error)
-      );
+      Alert.alert('Update failed', errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
-  function confirmStatus(
-    orderId: string,
-    status: string
-  ) {
+  function confirmStatus(orderId: string, status: string) {
     Alert.alert(
       'Update order?',
       `Change this order's status to ${status}?`,
       [
-        {
-          text: 'Go Back',
-          style: 'cancel',
-        },
+        { text: 'Go Back', style: 'cancel' },
         {
           text: 'Confirm',
           onPress: () => {
@@ -888,35 +902,27 @@ export default function App() {
 
   function statusColor(status: string) {
     switch (status) {
-      case 'pending':
-        return '#B45309';
-      case 'accepted':
-        return '#2563EB';
-      case 'completed':
-        return '#15803D';
+      case 'pending': return '#B45309';
+      case 'accepted': return '#2563EB';
+      case 'completed': return '#15803D';
       case 'declined':
-      case 'cancelled':
-        return '#B91C1C';
-      default:
-        return '#555555';
+      case 'cancelled': return '#B91C1C';
+      default: return '#555555';
     }
   }
 
   function statusBackground(status: string) {
     switch (status) {
-      case 'pending':
-        return '#FEF3C7';
-      case 'accepted':
-        return '#DBEAFE';
-      case 'completed':
-        return '#DCFCE7';
+      case 'pending': return '#FEF3C7';
+      case 'accepted': return '#DBEAFE';
+      case 'completed': return '#DCFCE7';
       case 'declined':
-      case 'cancelled':
-        return '#FEE2E2';
-      default:
-        return '#EEEEEE';
+      case 'cancelled': return '#FEE2E2';
+      default: return '#EEEEEE';
     }
   }
+
+  // Navigation helpers
 
   function backButton(
     label = 'Back to Home',
@@ -926,12 +932,42 @@ export default function App() {
       <TouchableOpacity
         style={styles.backButton}
         disabled={busy}
-        onPress={() => setCurrentScreen(screen)}
+        onPress={() => {
+          clearPasswordFields();
+          setCurrentScreen(screen);
+        }}
       >
-        <Text style={styles.backButtonText}>
-          {label}
-        </Text>
+        <Text style={styles.backButtonText}>{label}</Text>
       </TouchableOpacity>
+    );
+  }
+
+  function page(
+    content: React.ReactNode,
+    home = false
+  ) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <ScrollView
+          contentContainerStyle={
+            home ? styles.homeScrollContent : styles.detailsContent
+          }
+          keyboardShouldPersistTaps="handled"
+        >
+          {content}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  function foodPicture(uri: string | null) {
+    return uri ? (
+      <Image source={{ uri }} style={styles.foodImage} />
+    ) : (
+      <View style={styles.imagePlaceholder}>
+        <Text style={styles.placeholderEmoji}>🍽️</Text>
+      </View>
     );
   }
 
@@ -941,16 +977,139 @@ export default function App() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.homeContent}>
-          <ActivityIndicator
-            size="large"
-            color="#2D4934"
-          />
+          <ActivityIndicator size="large" color="#2D4934" />
         </View>
       </SafeAreaView>
     );
   }
 
-  // Login and registration
+  // Forgot password screen
+
+  if (currentScreen === 'forgot-password') {
+    return page(
+      <>
+        {backButton('Back to Log In', 'login')}
+
+        <Text style={styles.title}>Forgot Password?</Text>
+
+        <Text style={styles.subtitle}>
+          Enter your email address and we will send
+          you a link to reset your password.
+        </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.detailLabel}>Email Address</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!busy}
+          />
+
+          <Button
+            label={
+              busy ? 'Sending...' : 'Send Password Reset Link'
+            }
+            disabled={busy}
+            onPress={resetPassword}
+          />
+        </View>
+
+        <Button
+          secondary
+          label="Back to Log In"
+          disabled={busy}
+          onPress={() => setCurrentScreen('login')}
+        />
+      </>
+    );
+  }
+
+  // Change password screen
+
+  if (currentScreen === 'change-password' && session) {
+    return page(
+      <>
+        {backButton('Back to My Profile', 'profile')}
+
+        <Text style={styles.title}>Change Password</Text>
+
+        <Text style={styles.subtitle}>
+          Keep your account safe and secure.
+        </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.detailLabel}>Current Password</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Enter current password"
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+          />
+
+          <Text style={styles.detailLabel}>New Password</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Enter new password"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+          />
+
+          <Text style={styles.detailLabel}>
+            Confirm New Password
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+          />
+
+          <Text style={styles.noticeText}>
+            Your new password must contain at least 8 characters.
+          </Text>
+
+          <Button
+            label={busy ? 'Updating Password...' : 'Update Password'}
+            disabled={busy}
+            onPress={changePassword}
+          />
+
+          <Button
+            secondary
+            label="Cancel"
+            disabled={busy}
+            onPress={() => {
+              clearPasswordFields();
+              setCurrentScreen('profile');
+            }}
+          />
+        </View>
+      </>
+    );
+  }
+
+  // Login and registration screen
 
   if (
     currentScreen === 'login' ||
@@ -961,72 +1120,81 @@ export default function App() {
   ) {
     const signUp = currentScreen === 'signup';
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        {backButton()}
 
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {backButton()}
+        <Text style={styles.title}>
+          {signUp ? 'Create Account' : 'Log In'}
+        </Text>
 
-          <Text style={styles.title}>
-            {signUp ? 'Create Account' : 'Log In'}
-          </Text>
+        <Text style={styles.subtitle}>
+          Welcome to Home-Cooked Marketplace
+        </Text>
 
-          <Text style={styles.subtitle}>
-            Welcome to Home-Cooked Marketplace
-          </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          editable={!busy}
+        />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!busy}
-          />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!busy}
+        />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            editable={!busy}
-          />
+        <Button
+          label={
+            busy
+              ? 'Please wait...'
+              : signUp
+              ? 'Create Account'
+              : 'Log In'
+          }
+          disabled={busy}
+          onPress={() => authenticate(signUp)}
+        />
 
-          <Button
-            label={
-              busy
-                ? 'Please wait...'
-                : signUp
-                ? 'Create Account'
-                : 'Log In'
-            }
+        {!signUp && (
+          <TouchableOpacity
+            style={styles.forgotPasswordButton}
             disabled={busy}
-            onPress={() => authenticate(signUp)}
-          />
+            onPress={() => {
+              setPassword('');
+              setCurrentScreen('forgot-password');
+            }}
+          >
+            <Text style={styles.backButtonText}>
+              Forgot Password?
+            </Text>
+          </TouchableOpacity>
+        )}
 
-          <Button
-            secondary
-            disabled={busy}
-            label={
-              signUp
-                ? 'Already have an account? Log In'
-                : 'New here? Create Account'
-            }
-            onPress={() =>
-              setCurrentScreen(
-                signUp ? 'login' : 'signup'
-              )
-            }
-          />
-        </ScrollView>
-      </SafeAreaView>
+        <Button
+          secondary
+          disabled={busy}
+          label={
+            signUp
+              ? 'Already have an account? Log In'
+              : 'New here? Create Account'
+          }
+          onPress={() => {
+            setPassword('');
+            setCurrentScreen(signUp ? 'login' : 'signup');
+          }}
+        />
+      </>
     );
   }
 
@@ -1036,205 +1204,181 @@ export default function App() {
     currentScreen === 'profile' ||
     currentScreen === 'edit-profile'
   ) {
-    const editing =
-      currentScreen === 'edit-profile';
+    const editing = currentScreen === 'edit-profile';
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        {backButton()}
 
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {backButton()}
+        <Text style={styles.title}>
+          {editing ? 'Edit Profile' : 'My Profile'}
+        </Text>
 
-          <Text style={styles.title}>
-            {editing ? 'Edit Profile' : 'My Profile'}
-          </Text>
+        <Text style={styles.subtitle}>
+          {session?.user.email}
+        </Text>
 
-          <Text style={styles.subtitle}>
-            {session?.user.email}
-          </Text>
-
-          {profileReady && (
-            <View style={styles.avatarSection}>
-              {avatarUrl ? (
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.avatar,
-                    styles.avatarPlaceholder,
-                  ]}
-                >
-                  <Text style={styles.avatarInitial}>
-                    {(
-                      fullName.trim() ||
-                      session?.user.email ||
-                      'U'
-                    )
-                      .charAt(0)
-                      .toUpperCase()}
-                  </Text>
-                </View>
-              )}
-
-              {editing && (
-                <TouchableOpacity
-                  disabled={busy}
-                  onPress={chooseProfilePicture}
-                >
-                  <Text style={styles.avatarButton}>
-                    {avatarUrl
-                      ? 'Change Profile Picture'
-                      : 'Add Profile Picture'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {!profileReady ? (
-            <Text style={styles.noticeText}>
-              Profile not loaded. If loading failed,
-              log out and try again.
-            </Text>
-          ) : editing ? (
-            <View style={styles.card}>
-              <Text style={styles.detailLabel}>
-                Full Name
-              </Text>
-
-              <TextInput
-                style={styles.input}
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Your name"
-                editable={!busy}
+        {profileReady && (
+          <View style={styles.avatarSection}>
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatar}
               />
-
-              <Text style={styles.detailLabel}>
-                Bio
-              </Text>
-
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.multilineInput,
-                ]}
-                value={bio}
-                onChangeText={setBio}
-                placeholder="Tell us about yourself"
-                multiline
-                editable={!busy}
-              />
-
-              <Text style={styles.detailLabel}>
-                Location
-              </Text>
-
-              <TextInput
-                style={styles.input}
-                value={location}
-                onChangeText={setLocation}
-                placeholder="City"
-                editable={!busy}
-              />
-
-              <View style={styles.switchRow}>
-                <Text style={styles.detailLabel}>
-                  I am a home cook
+            ) : (
+              <View style={[
+                styles.avatar,
+                styles.avatarPlaceholder,
+              ]}>
+                <Text style={styles.avatarInitial}>
+                  {(
+                    fullName.trim() ||
+                    session?.user.email ||
+                    'U'
+                  ).charAt(0).toUpperCase()}
                 </Text>
-
-                <Switch
-                  value={isCook}
-                  onValueChange={setIsCook}
-                  disabled={busy}
-                />
               </View>
+            )}
 
-              <View style={{ marginTop: 20 }}>
-                <Button
-                  label={
-                    busy
-                      ? 'Saving...'
-                      : 'Save Profile'
-                  }
-                  disabled={busy}
-                  onPress={saveProfile}
-                />
-              </View>
-            </View>
-          ) : (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {fullName || 'Your Profile'}
+            {editing && (
+              <TouchableOpacity
+                disabled={busy}
+                onPress={chooseProfilePicture}
+              >
+                <Text style={styles.avatarButton}>
+                  {avatarUrl
+                    ? 'Change Profile Picture'
+                    : 'Add Profile Picture'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {!profileReady ? (
+          <Text style={styles.noticeText}>
+            Profile not loaded. If loading failed,
+            log out and try again.
+          </Text>
+        ) : editing ? (
+          <View style={styles.card}>
+            <Text style={styles.detailLabel}>Full Name</Text>
+
+            <TextInput
+              style={styles.input}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Your name"
+              editable={!busy}
+            />
+
+            <Text style={styles.detailLabel}>Bio</Text>
+
+            <TextInput
+              style={[styles.input, styles.multilineInput]}
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Tell us about yourself"
+              multiline
+              editable={!busy}
+            />
+
+            <Text style={styles.detailLabel}>Location</Text>
+
+            <TextInput
+              style={styles.input}
+              value={location}
+              onChangeText={setLocation}
+              placeholder="City"
+              editable={!busy}
+            />
+
+            <View style={styles.switchRow}>
+              <Text style={styles.detailLabel}>
+                I am a home cook
               </Text>
 
-              <Field
-                label="Bio"
-                value={bio || 'Not added yet'}
+              <Switch
+                value={isCook}
+                onValueChange={setIsCook}
+                disabled={busy}
               />
-
-              <Field
-                label="Location"
-                value={location || 'Not added yet'}
-              />
-
-              <Field
-                label="Account Type"
-                value={
-                  isCook ? 'Home Cook' : 'Customer'
-                }
-              />
-
-              <Button
-                label="Edit Profile"
-                onPress={() =>
-                  setCurrentScreen('edit-profile')
-                }
-              />
-
-              <Button
-                secondary
-                label="My Orders"
-                onPress={() =>
-                  setCurrentScreen('my-orders')
-                }
-              />
-
-              <Button
-                secondary
-                label="Incoming Orders"
-                onPress={() =>
-                  setCurrentScreen('incoming-orders')
-                }
-              />
-
-              {isCook && (
-                <Button
-                  secondary
-                  label="My Listings"
-                  onPress={() =>
-                    setCurrentScreen('my-listings')
-                  }
-                />
-              )}
             </View>
-          )}
 
+            <Button
+              label={busy ? 'Saving...' : 'Save Profile'}
+              disabled={busy}
+              onPress={saveProfile}
+            />
+          </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              {fullName || 'Your Profile'}
+            </Text>
+
+            <Field label="Bio" value={bio || 'Not added yet'} />
+
+            <Field
+              label="Location"
+              value={location || 'Not added yet'}
+            />
+
+            <Field
+              label="Account Type"
+              value={isCook ? 'Home Cook' : 'Customer'}
+            />
+
+            <Button
+              label="Edit Profile"
+              disabled={busy}
+              onPress={() => setCurrentScreen('edit-profile')}
+            />
+
+            <Button
+              secondary
+              label="My Orders"
+              disabled={busy}
+              onPress={() => setCurrentScreen('my-orders')}
+            />
+
+            <Button
+              secondary
+              label="Incoming Orders"
+              disabled={busy}
+              onPress={() => setCurrentScreen('incoming-orders')}
+            />
+
+            {isCook && (
+              <Button
+                secondary
+                label="My Listings"
+                disabled={busy}
+                onPress={() => setCurrentScreen('my-listings')}
+              />
+            )}
+          </View>
+        )}
+
+        {!editing && (
           <Button
             secondary
-            label="Log Out"
+            label="Change Password"
             disabled={busy}
-            onPress={logout}
+            onPress={() => {
+              clearPasswordFields();
+              setCurrentScreen('change-password');
+            }}
           />
-        </ScrollView>
-      </SafeAreaView>
+        )}
+
+        <Button
+          secondary
+          label="Log Out"
+          disabled={busy}
+          onPress={logout}
+        />
+      </>
     );
   }
 
@@ -1242,183 +1386,134 @@ export default function App() {
 
   if (currentScreen === 'listing-form') {
     if (!profileReady || !isCook) {
-      return (
-        <SafeAreaView style={styles.container}>
-          <View style={styles.homeContent}>
-            <Text style={styles.title}>
-              Home Cook Account Required
-            </Text>
-
-            <Text style={styles.subtitle}>
-              Enable the home cook option in your profile.
-            </Text>
-
-            <Button
-              label="Edit Profile"
-              onPress={() =>
-                setCurrentScreen('edit-profile')
-              }
-            />
-
-            <Button
-              secondary
-              label="Back to Home"
-              onPress={() =>
-                setCurrentScreen('home')
-              }
-            />
-          </View>
-        </SafeAreaView>
-      );
-    }
-
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
-
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {backButton(
-            'Back to My Listings',
-            'my-listings'
-          )}
-
+      return page(
+        <>
           <Text style={styles.title}>
-            {editingId
-              ? 'Edit Food Listing'
-              : 'Create Food Listing'}
+            Home Cook Account Required
           </Text>
 
           <Text style={styles.subtitle}>
-            Share your delicious homemade meals
-            with your community.
+            Enable the home cook option in your profile.
           </Text>
 
-          <View style={styles.card}>
-            {mealImage ? (
-              <Image
-                source={{ uri: mealImage }}
-                style={styles.foodImage}
-              />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.placeholderEmoji}>
-                  🍽️
-                </Text>
+          <Button
+            label="Edit Profile"
+            onPress={() => setCurrentScreen('edit-profile')}
+          />
 
-                <Text style={styles.noticeText}>
-                  Add a photo of your meal
-                </Text>
-              </View>
-            )}
+          <Button
+            secondary
+            label="Back to Home"
+            onPress={() => setCurrentScreen('home')}
+          />
+        </>
+      );
+    }
 
-            <Button
-              secondary
+    return page(
+      <>
+        {backButton('Back to My Listings', 'my-listings')}
+
+        <Text style={styles.title}>
+          {editingId ? 'Edit Food Listing' : 'Create Food Listing'}
+        </Text>
+
+        <Text style={styles.subtitle}>
+          Share your delicious homemade meals with your community.
+        </Text>
+
+        <View style={styles.card}>
+          {foodPicture(mealImage)}
+
+          <Button
+            secondary
+            disabled={busy}
+            label={mealImage ? 'Change Food Picture' : 'Add Food Picture'}
+            onPress={chooseMealImage}
+          />
+
+          <Text style={styles.detailLabel}>Meal Name</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Homemade Chicken and Rice"
+            value={mealTitle}
+            onChangeText={setMealTitle}
+            editable={!busy}
+          />
+
+          <Text style={styles.detailLabel}>Description</Text>
+
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Describe your homemade meal..."
+            value={mealDescription}
+            onChangeText={setMealDescription}
+            multiline
+            editable={!busy}
+          />
+
+          <Text style={styles.detailLabel}>
+            Price per Portion ($)
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="12.99"
+            value={mealPrice}
+            onChangeText={setMealPrice}
+            keyboardType="decimal-pad"
+            editable={!busy}
+          />
+
+          <Text style={styles.detailLabel}>
+            Available Portions
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="5"
+            value={mealPortions}
+            onChangeText={setMealPortions}
+            keyboardType="number-pad"
+            editable={!busy}
+          />
+
+          <Text style={styles.detailLabel}>Location</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="City"
+            value={mealLocation}
+            onChangeText={setMealLocation}
+            editable={!busy}
+          />
+
+          <View style={styles.switchRow}>
+            <Text style={styles.detailLabel}>
+              Available for Customers
+            </Text>
+
+            <Switch
+              value={available}
+              onValueChange={setAvailable}
               disabled={busy}
-              label={
-                mealImage
-                  ? 'Change Food Picture'
-                  : 'Add Food Picture'
-              }
-              onPress={chooseMealImage}
             />
-
-            <Text style={styles.detailLabel}>
-              Meal Name
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Homemade Chicken and Rice"
-              value={mealTitle}
-              onChangeText={setMealTitle}
-              editable={!busy}
-            />
-
-            <Text style={styles.detailLabel}>
-              Description
-            </Text>
-
-            <TextInput
-              style={[
-                styles.input,
-                styles.multilineInput,
-              ]}
-              placeholder="Describe your homemade meal..."
-              value={mealDescription}
-              onChangeText={setMealDescription}
-              multiline
-              editable={!busy}
-            />
-
-            <Text style={styles.detailLabel}>
-              Price per Portion ($)
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="12.99"
-              value={mealPrice}
-              onChangeText={setMealPrice}
-              keyboardType="decimal-pad"
-              editable={!busy}
-            />
-
-            <Text style={styles.detailLabel}>
-              Available Portions
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="5"
-              value={mealPortions}
-              onChangeText={setMealPortions}
-              keyboardType="number-pad"
-              editable={!busy}
-            />
-
-            <Text style={styles.detailLabel}>
-              Location
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="City"
-              value={mealLocation}
-              onChangeText={setMealLocation}
-              editable={!busy}
-            />
-
-            <View style={styles.switchRow}>
-              <Text style={styles.detailLabel}>
-                Available for Customers
-              </Text>
-
-              <Switch
-                value={available}
-                onValueChange={setAvailable}
-                disabled={busy}
-              />
-            </View>
-
-            <View style={{ marginTop: 20 }}>
-              <Button
-                label={
-                  busy
-                    ? 'Saving...'
-                    : editingId
-                    ? 'Save Changes'
-                    : 'Publish Listing'
-                }
-                disabled={busy}
-                onPress={saveListing}
-              />
-            </View>
           </View>
-        </ScrollView>
-      </SafeAreaView>
+
+          <Button
+            label={
+              busy
+                ? 'Saving...'
+                : editingId
+                ? 'Save Changes'
+                : 'Publish Listing'
+            }
+            disabled={busy}
+            onPress={saveListing}
+          />
+        </View>
+      </>
     );
   }
 
@@ -1428,8 +1523,7 @@ export default function App() {
     currentScreen === 'meals' ||
     currentScreen === 'my-listings'
   ) {
-    const own =
-      currentScreen === 'my-listings';
+    const own = currentScreen === 'my-listings';
 
     const visible = listings.filter((item) =>
       own
@@ -1437,186 +1531,137 @@ export default function App() {
         : item.is_available && item.portions > 0
     );
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        {backButton()}
 
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
+        <Text style={styles.title}>
+          {own ? 'My Listings' : 'Explore Homemade Meals'}
+        </Text>
+
+        <Text style={styles.subtitle}>
+          {own
+            ? 'Create and manage your homemade food listings.'
+            : 'Discover delicious meals prepared by home cooks in your community.'}
+        </Text>
+
+        {own && isCook && profileReady && (
+          <Button
+            label="+ Create Food Listing"
+            disabled={busy}
+            onPress={() => openListingForm()}
+          />
+        )}
+
+        <TouchableOpacity
+          style={styles.backButton}
+          disabled={loadingListings || busy}
+          onPress={loadListings}
         >
-          {backButton()}
-
-          <Text style={styles.title}>
-            {own
-              ? 'My Listings'
-              : 'Explore Homemade Meals'}
+          <Text style={styles.backButtonText}>
+            Refresh Listings
           </Text>
+        </TouchableOpacity>
 
-          <Text style={styles.subtitle}>
-            {own
-              ? 'Create and manage your homemade food listings.'
-              : 'Discover delicious meals prepared by home cooks in your community.'}
-          </Text>
+        <Text style={styles.sectionTitle}>
+          {own ? 'Your Meals' : 'Available Meals'}
+        </Text>
 
-          {own && isCook && profileReady && (
-            <Button
-              label="+ Create Food Listing"
-              disabled={busy}
-              onPress={() => openListingForm()}
-            />
-          )}
+        {loadingListings ? (
+          <ActivityIndicator size="large" color="#2D4934" />
+        ) : listingError ? (
+          <Text style={styles.noticeText}>{listingError}</Text>
+        ) : visible.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>No Meals Yet</Text>
 
-          <TouchableOpacity
-            style={styles.backButton}
-            disabled={loadingListings || busy}
-            onPress={loadListings}
-          >
-            <Text style={styles.backButtonText}>
-              Refresh Listings
+            <Text style={styles.cardText}>
+              {own
+                ? 'Create your first food listing to get started.'
+                : 'Check back soon for delicious homemade meals.'}
             </Text>
-          </TouchableOpacity>
+          </View>
+        ) : (
+          visible.map((item) => (
+            <View key={item.id} style={styles.mealCard}>
+              {foodPicture(item.image_url)}
 
-          <Text style={styles.sectionTitle}>
-            {own ? 'Your Meals' : 'Available Meals'}
-          </Text>
+              <View style={styles.mealHeader}>
+                <Text style={styles.mealName}>{item.title}</Text>
+                <Text style={styles.mealPrice}>
+                  {money(item.price)}
+                </Text>
+              </View>
 
-          {loadingListings ? (
-            <ActivityIndicator
-              size="large"
-              color="#2D4934"
-            />
-          ) : listingError ? (
-            <Text style={styles.noticeText}>
-              {listingError}
-            </Text>
-          ) : visible.length === 0 ? (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                No Meals Yet
+              <Text style={styles.mealLocation}>
+                {item.location}
               </Text>
 
-              <Text style={styles.cardText}>
-                {own
-                  ? 'Create your first food listing to get started.'
-                  : 'Check back soon for delicious homemade meals.'}
+              <Text style={styles.mealDescription}>
+                {item.description}
               </Text>
-            </View>
-          ) : (
-            visible.map((item) => (
-              <View
-                key={item.id}
-                style={styles.mealCard}
-              >
-                {item.image_url ? (
-                  <Image
-                    source={{
-                      uri: item.image_url,
-                    }}
-                    style={styles.foodImage}
-                  />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Text
-                      style={styles.placeholderEmoji}
-                    >
-                      🍽️
-                    </Text>
-                  </View>
-                )}
 
-                <View style={styles.mealHeader}>
-                  <Text style={styles.mealName}>
-                    {item.title}
-                  </Text>
+              <Text style={styles.mealLocation}>
+                {item.portions} portions available
+              </Text>
 
-                  <Text style={styles.mealPrice}>
-                    {money(item.price)}
-                  </Text>
-                </View>
-
-                <Text style={styles.mealLocation}>
-                  {item.location}
+              {own && (
+                <Text style={[
+                  styles.availabilityText,
+                  {
+                    color:
+                      item.is_available && item.portions > 0
+                        ? '#15803D'
+                        : '#B45309',
+                  },
+                ]}>
+                  {item.is_available && item.portions > 0
+                    ? 'Available'
+                    : 'Unavailable'}
                 </Text>
+              )}
 
-                <Text style={styles.mealDescription}>
-                  {item.description}
-                </Text>
+              <Button
+                label="View Details"
+                disabled={busy}
+                onPress={() => {
+                  setDetailsBack(currentScreen);
+                  setCurrentScreen(`meal-${item.id}`);
+                }}
+              />
 
-                <Text style={styles.mealLocation}>
-                  {item.portions} portions available
-                </Text>
-
-                {own && (
-                  <Text
-                    style={[
-                      styles.availabilityText,
-                      {
-                        color:
-                          item.is_available &&
-                          item.portions > 0
-                            ? '#15803D'
-                            : '#B45309',
-                      },
-                    ]}
-                  >
-                    {item.is_available &&
-                    item.portions > 0
-                      ? 'Available'
-                      : 'Unavailable'}
-                  </Text>
-                )}
-
+              {!own && item.cook_id !== userId && (
                 <Button
-                  label="View Details"
+                  secondary
+                  label="Order Now"
                   disabled={busy}
-                  onPress={() => {
-                    setDetailsBack(currentScreen);
-                    setCurrentScreen(
-                      `meal-${item.id}`
-                    );
-                  }}
+                  onPress={() => openOrderForm(item)}
                 />
+              )}
 
-                {!own &&
-                  item.cook_id !== userId && (
+              {own && (
+                <>
+                  {isCook && (
                     <Button
                       secondary
-                      label="Order Now"
+                      label="Edit Listing"
                       disabled={busy}
-                      onPress={() =>
-                        openOrderForm(item)
-                      }
+                      onPress={() => openListingForm(item)}
                     />
                   )}
 
-                {own && (
-                  <>
-                    {isCook && (
-                      <Button
-                        secondary
-                        label="Edit Listing"
-                        disabled={busy}
-                        onPress={() =>
-                          openListingForm(item)
-                        }
-                      />
-                    )}
-
-                    <Button
-                      danger
-                      label="Delete Listing"
-                      disabled={busy}
-                      onPress={() =>
-                        deleteListing(item)
-                      }
-                    />
-                  </>
-                )}
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </SafeAreaView>
+                  <Button
+                    danger
+                    label="Delete Listing"
+                    disabled={busy}
+                    onPress={() => deleteListing(item)}
+                  />
+                </>
+              )}
+            </View>
+          ))
+        )}
+      </>
     );
   }
 
@@ -1629,91 +1674,77 @@ export default function App() {
       (listing) => listing.id === mealId
     );
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        {backButton(
+          detailsBack === 'my-listings'
+            ? 'Back to My Listings'
+            : 'Back to Meals',
+          detailsBack
+        )}
 
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
-        >
-          {backButton(
-            detailsBack === 'my-listings'
-              ? 'Back to My Listings'
-              : 'Back to Meals',
-            detailsBack
-          )}
+        {item ? (
+          <>
+            <Text style={styles.title}>{item.title}</Text>
 
-          {item ? (
-            <>
-              <Text style={styles.title}>
-                {item.title}
-              </Text>
+            {item.image_url && (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.detailsFoodImage}
+              />
+            )}
 
-              {item.image_url && (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.detailsFoodImage}
+            <View style={styles.card}>
+              <Field
+                label="Price per Portion"
+                value={money(item.price)}
+              />
+
+              <Field
+                label="Description"
+                value={item.description}
+              />
+
+              <Field
+                label="Available Portions"
+                value={String(item.portions)}
+              />
+
+              <Field label="Location" value={item.location} />
+
+              <Field
+                label="Availability"
+                value={
+                  item.is_available && item.portions > 0
+                    ? 'Available'
+                    : 'Unavailable'
+                }
+              />
+
+              {item.cook_id !== userId &&
+              item.is_available &&
+              item.portions > 0 ? (
+                <Button
+                  label="Place Order"
+                  onPress={() => openOrderForm(item)}
                 />
+              ) : item.cook_id === userId ? (
+                <Text style={styles.noticeText}>
+                  This is your own food listing.
+                </Text>
+              ) : (
+                <Text style={styles.noticeText}>
+                  This meal is currently unavailable.
+                </Text>
               )}
-
-              <View style={styles.card}>
-                <Field
-                  label="Price per Portion"
-                  value={money(item.price)}
-                />
-
-                <Field
-                  label="Description"
-                  value={item.description}
-                />
-
-                <Field
-                  label="Available Portions"
-                  value={String(item.portions)}
-                />
-
-                <Field
-                  label="Location"
-                  value={item.location}
-                />
-
-                <Field
-                  label="Availability"
-                  value={
-                    item.is_available &&
-                    item.portions > 0
-                      ? 'Available'
-                      : 'Unavailable'
-                  }
-                />
-
-                {item.cook_id !== userId &&
-                item.is_available &&
-                item.portions > 0 ? (
-                  <Button
-                    label="Place Order"
-                    onPress={() =>
-                      openOrderForm(item)
-                    }
-                  />
-                ) : item.cook_id === userId ? (
-                  <Text style={styles.noticeText}>
-                    This is your own food listing.
-                  </Text>
-                ) : (
-                  <Text style={styles.noticeText}>
-                    This meal is currently unavailable.
-                  </Text>
-                )}
-              </View>
-            </>
-          ) : (
-            <Text style={styles.noticeText}>
-              This listing is unavailable.
-            </Text>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.noticeText}>
+            This listing is unavailable.
+          </Text>
+        )}
+      </>
     );
   }
 
@@ -1722,144 +1753,99 @@ export default function App() {
   if (currentScreen === 'place-order') {
     const item = selectedListing;
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        {backButton('Back to Meals', 'meals')}
 
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
-        >
-          {backButton('Back to Meals', 'meals')}
+        <Text style={styles.title}>Place Your Order</Text>
 
-          <Text style={styles.title}>
-            Place Your Order
-          </Text>
+        <Text style={styles.subtitle}>
+          Review your meal and select the number of
+          portions you would like.
+        </Text>
 
-          <Text style={styles.subtitle}>
-            Review your meal and select the number
-            of portions you would like.
-          </Text>
+        {item ? (
+          <View style={styles.card}>
+            {item.image_url && foodPicture(item.image_url)}
 
-          {item ? (
-            <View style={styles.card}>
-              {item.image_url && (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.foodImage}
-                />
-              )}
+            <Text style={styles.cardTitle}>{item.title}</Text>
 
-              <Text style={styles.cardTitle}>
-                {item.title}
-              </Text>
+            <Field
+              label="Price per Portion"
+              value={money(item.price)}
+            />
 
-              <Field
-                label="Price per Portion"
-                value={money(item.price)}
-              />
+            <Field label="Location" value={item.location} />
 
-              <Field
-                label="Location"
-                value={item.location}
-              />
+            <Field
+              label="Available Portions"
+              value={String(item.portions)}
+            />
 
-              <Field
-                label="Available Portions"
-                value={String(item.portions)}
-              />
+            <Text style={styles.detailLabel}>Quantity</Text>
 
-              <Text style={styles.detailLabel}>
-                Quantity
-              </Text>
-
-              <View style={styles.quantityRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.quantityButton,
-                    (quantity <= 1 || busy) && {
-                      opacity: 0.4,
-                    },
-                  ]}
-                  disabled={quantity <= 1 || busy}
-                  onPress={() =>
-                    setQuantity((previous) =>
-                      Math.max(1, previous - 1)
-                    )
-                  }
-                >
-                  <Text
-                    style={styles.quantityButtonText}
-                  >
-                    −
-                  </Text>
-                </TouchableOpacity>
-
-                <Text style={styles.quantityNumber}>
-                  {quantity}
-                </Text>
-
-                <TouchableOpacity
-                  style={[
-                    styles.quantityButton,
-                    (quantity >= item.portions ||
-                      busy) && {
-                      opacity: 0.4,
-                    },
-                  ]}
-                  disabled={
-                    quantity >= item.portions ||
-                    busy
-                  }
-                  onPress={() =>
-                    setQuantity((previous) =>
-                      Math.min(
-                        item.portions,
-                        previous + 1
-                      )
-                    )
-                  }
-                >
-                  <Text
-                    style={styles.quantityButtonText}
-                  >
-                    +
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.totalBox}>
-                <Text style={styles.totalLabel}>
-                  Order Total
-                </Text>
-
-                <Text style={styles.totalPrice}>
-                  {money(item.price * quantity)}
-                </Text>
-              </View>
-
-              <Text style={styles.paymentNotice}>
-                Your order will be sent to the home cook.
-                Online payment is not required or collected
-                through this app.
-              </Text>
-
-              <Button
-                label={
-                  busy
-                    ? 'Placing Order...'
-                    : 'Confirm Order'
+            <View style={styles.quantityRow}>
+              <TouchableOpacity
+                style={[
+                  styles.quantityButton,
+                  (quantity <= 1 || busy) && { opacity: 0.4 },
+                ]}
+                disabled={quantity <= 1 || busy}
+                onPress={() =>
+                  setQuantity((previous) =>
+                    Math.max(1, previous - 1)
+                  )
                 }
-                disabled={busy}
-                onPress={confirmOrder}
-              />
+              >
+                <Text style={styles.quantityButtonText}>−</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.quantityNumber}>
+                {quantity}
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.quantityButton,
+                  (quantity >= item.portions || busy) && {
+                    opacity: 0.4,
+                  },
+                ]}
+                disabled={quantity >= item.portions || busy}
+                onPress={() =>
+                  setQuantity((previous) =>
+                    Math.min(item.portions, previous + 1)
+                  )
+                }
+              >
+                <Text style={styles.quantityButtonText}>+</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            <Text style={styles.noticeText}>
-              No meal selected.
+
+            <View style={styles.totalBox}>
+              <Text style={styles.totalLabel}>Order Total</Text>
+
+              <Text style={styles.totalPrice}>
+                {money(item.price * quantity)}
+              </Text>
+            </View>
+
+            <Text style={styles.paymentNotice}>
+              Your order will be sent to the home cook.
+              Online payment is not required or collected
+              through this app.
             </Text>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+
+            <Button
+              label={busy ? 'Placing Order...' : 'Confirm Order'}
+              disabled={busy}
+              onPress={confirmOrder}
+            />
+          </View>
+        ) : (
+          <Text style={styles.noticeText}>No meal selected.</Text>
+        )}
+      </>
     );
   }
 
@@ -1869,400 +1855,317 @@ export default function App() {
     currentScreen === 'my-orders' ||
     currentScreen === 'incoming-orders'
   ) {
-    const incoming =
-      currentScreen === 'incoming-orders';
+    const incoming = currentScreen === 'incoming-orders';
 
-    const visibleOrders = orders.filter(
-      (order) =>
-        incoming
-          ? order.cook_id === userId
-          : order.customer_id === userId
+    const visibleOrders = orders.filter((order) =>
+      incoming
+        ? order.cook_id === userId
+        : order.customer_id === userId
     );
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        {backButton()}
 
-        <ScrollView
-          contentContainerStyle={styles.detailsContent}
+        <Text style={styles.title}>
+          {incoming ? 'Incoming Orders' : 'My Orders'}
+        </Text>
+
+        <Text style={styles.subtitle}>
+          {incoming
+            ? 'Manage orders placed by your customers.'
+            : 'Track your orders and their current status.'}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.backButton}
+          disabled={loadingOrders || busy}
+          onPress={loadOrders}
         >
-          {backButton()}
-
-          <Text style={styles.title}>
-            {incoming
-              ? 'Incoming Orders'
-              : 'My Orders'}
+          <Text style={styles.backButtonText}>
+            Refresh Orders
           </Text>
+        </TouchableOpacity>
 
-          <Text style={styles.subtitle}>
-            {incoming
-              ? 'Manage orders placed by your customers.'
-              : 'Track your orders and their current status.'}
-          </Text>
+        {loadingOrders ? (
+          <ActivityIndicator size="large" color="#2D4934" />
+        ) : orderError ? (
+          <Text style={styles.noticeText}>{orderError}</Text>
+        ) : visibleOrders.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>No Orders Yet</Text>
 
-          <TouchableOpacity
-            style={styles.backButton}
-            disabled={loadingOrders || busy}
-            onPress={loadOrders}
-          >
-            <Text style={styles.backButtonText}>
-              Refresh Orders
+            <Text style={styles.cardText}>
+              {incoming
+                ? 'Customer orders will appear here.'
+                : 'Explore homemade meals and place your first order.'}
             </Text>
-          </TouchableOpacity>
 
-          {loadingOrders ? (
-            <ActivityIndicator
-              size="large"
-              color="#2D4934"
-            />
-          ) : orderError ? (
-            <Text style={styles.noticeText}>
-              {orderError}
-            </Text>
-          ) : visibleOrders.length === 0 ? (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                No Orders Yet
+            {!incoming && (
+              <Button
+                label="Explore Meals"
+                onPress={() => setCurrentScreen('meals')}
+              />
+            )}
+          </View>
+        ) : (
+          visibleOrders.map((order) => (
+            <View key={order.id} style={styles.mealCard}>
+              <View style={styles.orderHeader}>
+                <Text style={styles.mealName}>
+                  {order.meal_title}
+                </Text>
+
+                <View style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor:
+                      statusBackground(order.status),
+                  },
+                ]}>
+                  <Text style={[
+                    styles.statusText,
+                    { color: statusColor(order.status) },
+                  ]}>
+                    {order.status.charAt(0).toUpperCase() +
+                      order.status.slice(1)}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.orderDate}>
+                Order #{order.id.slice(0, 8)}
               </Text>
 
-              <Text style={styles.cardText}>
-                {incoming
-                  ? 'Customer orders will appear here.'
-                  : 'Explore homemade meals and place your first order.'}
+              <Text style={styles.orderDate}>
+                {new Date(order.created_at).toLocaleString()}
               </Text>
 
-              {!incoming && (
-                <View style={{ marginTop: 20 }}>
+              <View style={styles.divider} />
+
+              <Field
+                label="Quantity"
+                value={`${order.quantity} portion(s)`}
+              />
+
+              <Field
+                label="Price per Portion"
+                value={money(order.unit_price)}
+              />
+
+              <View style={styles.totalBox}>
+                <Text style={styles.totalLabel}>Total</Text>
+
+                <Text style={styles.totalPrice}>
+                  {money(order.total_price)}
+                </Text>
+              </View>
+
+              {incoming && order.status === 'pending' && (
+                <>
                   <Button
-                    label="Explore Meals"
+                    label="Accept Order"
+                    disabled={busy}
                     onPress={() =>
-                      setCurrentScreen('meals')
+                      confirmStatus(order.id, 'accepted')
                     }
                   />
-                </View>
+
+                  <Button
+                    danger
+                    label="Decline Order"
+                    disabled={busy}
+                    onPress={() =>
+                      confirmStatus(order.id, 'declined')
+                    }
+                  />
+                </>
+              )}
+
+              {incoming && order.status === 'accepted' && (
+                <Button
+                  label="Mark as Completed"
+                  disabled={busy}
+                  onPress={() =>
+                    confirmStatus(order.id, 'completed')
+                  }
+                />
+              )}
+
+              {!incoming && order.status === 'pending' && (
+                <>
+                  <Text style={styles.paymentNotice}>
+                    Waiting for the home cook to accept your order.
+                  </Text>
+
+                  <Button
+                    danger
+                    label="Cancel Order"
+                    disabled={busy}
+                    onPress={() =>
+                      confirmStatus(order.id, 'cancelled')
+                    }
+                  />
+                </>
+              )}
+
+              {!incoming && order.status === 'accepted' && (
+                <Text style={styles.successNotice}>
+                  Your order has been accepted!
+                </Text>
+              )}
+
+              {order.status === 'completed' && (
+                <Text style={styles.successNotice}>
+                  Order successfully completed.
+                </Text>
+              )}
+
+              {order.status === 'declined' && (
+                <Text style={styles.noticeText}>
+                  This order was declined by the cook.
+                </Text>
+              )}
+
+              {order.status === 'cancelled' && (
+                <Text style={styles.noticeText}>
+                  This order has been cancelled.
+                </Text>
               )}
             </View>
-          ) : (
-            visibleOrders.map((order) => (
-              <View
-                key={order.id}
-                style={styles.mealCard}
-              >
-                <View style={styles.orderHeader}>
-                  <Text style={styles.mealName}>
-                    {order.meal_title}
-                  </Text>
-
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor:
-                          statusBackground(order.status),
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        {
-                          color: statusColor(
-                            order.status
-                          ),
-                        },
-                      ]}
-                    >
-                      {order.status
-                        .charAt(0)
-                        .toUpperCase() +
-                        order.status.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.orderDate}>
-                  Order #{order.id.slice(0, 8)}
-                </Text>
-
-                <Text style={styles.orderDate}>
-                  {new Date(
-                    order.created_at
-                  ).toLocaleString()}
-                </Text>
-
-                <View style={styles.divider} />
-
-                <Field
-                  label="Quantity"
-                  value={`${order.quantity} portion(s)`}
-                />
-
-                <Field
-                  label="Price per Portion"
-                  value={money(order.unit_price)}
-                />
-
-                <View style={styles.totalBox}>
-                  <Text style={styles.totalLabel}>
-                    Total
-                  </Text>
-
-                  <Text style={styles.totalPrice}>
-                    {money(order.total_price)}
-                  </Text>
-                </View>
-
-                {incoming &&
-                  order.status === 'pending' && (
-                    <>
-                      <Button
-                        label="Accept Order"
-                        disabled={busy}
-                        onPress={() =>
-                          confirmStatus(
-                            order.id,
-                            'accepted'
-                          )
-                        }
-                      />
-
-                      <Button
-                        danger
-                        label="Decline Order"
-                        disabled={busy}
-                        onPress={() =>
-                          confirmStatus(
-                            order.id,
-                            'declined'
-                          )
-                        }
-                      />
-                    </>
-                  )}
-
-                {incoming &&
-                  order.status === 'accepted' && (
-                    <Button
-                      label="Mark as Completed"
-                      disabled={busy}
-                      onPress={() =>
-                        confirmStatus(
-                          order.id,
-                          'completed'
-                        )
-                      }
-                    />
-                  )}
-
-                {!incoming &&
-                  order.status === 'pending' && (
-                    <>
-                      <Text style={styles.paymentNotice}>
-                        Waiting for the home cook to
-                        accept your order.
-                      </Text>
-
-                      <Button
-                        danger
-                        label="Cancel Order"
-                        disabled={busy}
-                        onPress={() =>
-                          confirmStatus(
-                            order.id,
-                            'cancelled'
-                          )
-                        }
-                      />
-                    </>
-                  )}
-
-                {!incoming &&
-                  order.status === 'accepted' && (
-                    <Text style={styles.successNotice}>
-                      Your order has been accepted!
-                    </Text>
-                  )}
-
-                {order.status === 'completed' && (
-                  <Text style={styles.successNotice}>
-                    Order successfully completed.
-                  </Text>
-                )}
-
-                {order.status === 'declined' && (
-                  <Text style={styles.noticeText}>
-                    This order was declined by the cook.
-                  </Text>
-                )}
-
-                {order.status === 'cancelled' && (
-                  <Text style={styles.noticeText}>
-                    This order has been cancelled.
-                  </Text>
-                )}
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </SafeAreaView>
+          ))
+        )}
+      </>
     );
   }
 
   // Become a home cook
 
   if (currentScreen === 'cook') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+    return page(
+      <>
+        <Text style={styles.title}>Become a Home Cook</Text>
 
-        <View style={styles.homeContent}>
-          <Text style={styles.title}>
-            Become a Home Cook
+        <Text style={styles.subtitle}>
+          Share your homemade meals with people in your
+          community and earn additional income.
+        </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>
+            Start Selling Your Meals
           </Text>
 
-          <Text style={styles.subtitle}>
-            Share your homemade meals with people
-            in your community and earn additional income.
+          <Text style={styles.cardText}>
+            Create your home cook profile, publish homemade
+            dishes, upload food pictures, and receive customer orders.
           </Text>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              Start Selling Your Meals
-            </Text>
-
-            <Text style={styles.cardText}>
-              Create your home cook profile, publish
-              homemade dishes, upload food pictures,
-              and receive customer orders.
-            </Text>
-          </View>
-
-          <Button
-            label={
-              !session
-                ? 'Log In / Create Account'
-                : profileReady && isCook
-                ? 'My Listings'
-                : 'Set Up Cook Profile'
-            }
-            onPress={() =>
-              setCurrentScreen(
-                !session
-                  ? 'login'
-                  : profileReady && isCook
-                  ? 'my-listings'
-                  : 'edit-profile'
-              )
-            }
-          />
-
-          <Button
-            secondary
-            label="Back to Home"
-            onPress={() =>
-              setCurrentScreen('home')
-            }
-          />
         </View>
-      </SafeAreaView>
+
+        <Button
+          label={
+            !session
+              ? 'Log In / Create Account'
+              : profileReady && isCook
+              ? 'My Listings'
+              : 'Set Up Cook Profile'
+          }
+          onPress={() =>
+            setCurrentScreen(
+              !session
+                ? 'login'
+                : profileReady && isCook
+                ? 'my-listings'
+                : 'edit-profile'
+            )
+          }
+        />
+
+        <Button
+          secondary
+          label="Back to Home"
+          onPress={() => setCurrentScreen('home')}
+        />
+      </>,
+      true
     );
   }
 
   // Home screen
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+  return page(
+    <>
+      <Text style={styles.homeEmoji}>🍽️</Text>
 
-      <ScrollView
-        contentContainerStyle={styles.homeScrollContent}
-      >
-        <Text style={styles.homeEmoji}>🍽️</Text>
+      <Text style={styles.title}>
+        Home-Cooked Marketplace
+      </Text>
 
-        <Text style={styles.title}>
-          Home-Cooked Marketplace
+      <Text style={styles.subtitle}>
+        Discover delicious homemade meals from local home cooks.
+      </Text>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          {session && fullName
+            ? `Welcome, ${fullName}!`
+            : 'Welcome!'}
         </Text>
 
-        <Text style={styles.subtitle}>
-          Discover delicious homemade meals from
-          local home cooks.
+        <Text style={styles.cardText}>
+          Find homemade meals or share your cooking
+          with your community.
         </Text>
+      </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            {session && fullName
-              ? `Welcome, ${fullName}!`
-              : 'Welcome!'}
-          </Text>
+      <Button
+        label="Explore Meals"
+        onPress={() =>
+          setCurrentScreen(session ? 'meals' : 'login')
+        }
+      />
 
-          <Text style={styles.cardText}>
-            Find homemade meals or share your cooking
-            with your community.
-          </Text>
-        </View>
+      <Button
+        label={session ? 'My Profile' : 'Log In / Create Account'}
+        onPress={() =>
+          setCurrentScreen(session ? 'profile' : 'login')
+        }
+      />
 
+      {session && (
         <Button
-          label="Explore Meals"
-          onPress={() =>
-            setCurrentScreen(
-              session ? 'meals' : 'login'
-            )
-          }
+          label="My Orders"
+          onPress={() => setCurrentScreen('my-orders')}
         />
+      )}
 
-        <Button
-          label={
-            session
-              ? 'My Profile'
-              : 'Log In / Create Account'
-          }
-          onPress={() =>
-            setCurrentScreen(
-              session ? 'profile' : 'login'
-            )
-          }
-        />
-
-        {session && (
-          <Button
-            label="My Orders"
-            onPress={() =>
-              setCurrentScreen('my-orders')
-            }
-          />
-        )}
-
-        {session && profileReady && isCook ? (
-          <>
-            <Button
-              secondary
-              label="My Listings"
-              onPress={() =>
-                setCurrentScreen('my-listings')
-              }
-            />
-
-            <Button
-              secondary
-              label="Incoming Orders"
-              onPress={() =>
-                setCurrentScreen('incoming-orders')
-              }
-            />
-          </>
-        ) : (
+      {session && profileReady && isCook ? (
+        <>
           <Button
             secondary
-            label="Become a Home Cook"
-            onPress={() =>
-              setCurrentScreen('cook')
-            }
+            label="My Listings"
+            onPress={() => setCurrentScreen('my-listings')}
           />
-        )}
-      </ScrollView>
-    </SafeAreaView>
+
+          <Button
+            secondary
+            label="Incoming Orders"
+            onPress={() => setCurrentScreen('incoming-orders')}
+          />
+        </>
+      ) : (
+        <Button
+          secondary
+          label="Become a Home Cook"
+          onPress={() => setCurrentScreen('cook')}
+        />
+      )}
+    </>,
+    true
   );
 }
+
+// Application styling
 
 const styles = StyleSheet.create({
   container: {
@@ -2272,7 +2175,6 @@ const styles = StyleSheet.create({
 
   homeContent: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
@@ -2284,15 +2186,15 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  homeEmoji: {
-    fontSize: 52,
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-
   detailsContent: {
     padding: 24,
-    paddingBottom: 40,
+    paddingBottom: 50,
+  },
+
+  homeEmoji: {
+    fontSize: 70,
+    textAlign: 'center',
+    marginBottom: 16,
   },
 
   title: {
@@ -2300,23 +2202,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2D4934',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
 
   subtitle: {
     fontSize: 16,
-    color: '#555555',
+    color: '#666666',
     textAlign: 'center',
-    marginBottom: 32,
     lineHeight: 24,
+    marginBottom: 24,
   },
 
   card: {
     backgroundColor: '#FFFFFF',
-    padding: 24,
-    borderRadius: 16,
-    width: '100%',
-    marginBottom: 24,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E8EDE8',
   },
 
   cardTitle: {
@@ -2334,25 +2237,26 @@ const styles = StyleSheet.create({
 
   button: {
     backgroundColor: '#2D4934',
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 4,
   },
 
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
   },
 
   secondaryButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
     borderColor: '#2D4934',
-    borderWidth: 2,
   },
 
   secondaryButtonText: {
@@ -2360,9 +2264,9 @@ const styles = StyleSheet.create({
   },
 
   dangerButton: {
-    backgroundColor: 'transparent',
-    borderColor: '#B91C1C',
+    backgroundColor: '#FEE2E2',
     borderWidth: 1,
+    borderColor: '#FECACA',
   },
 
   dangerButtonText: {
@@ -2370,9 +2274,9 @@ const styles = StyleSheet.create({
   },
 
   backButton: {
-    marginBottom: 24,
     alignSelf: 'flex-start',
-    paddingVertical: 8,
+    paddingVertical: 10,
+    marginBottom: 14,
   },
 
   backButtonText: {
@@ -2381,54 +2285,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2D4934',
-    marginBottom: 20,
+  forgotPasswordButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
   },
 
-  mealCard: {
+  input: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#D5DDD5',
+    borderRadius: 12,
+    padding: 15,
+    fontSize: 16,
+    color: '#222222',
+    marginBottom: 16,
   },
 
-  mealHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-
-  mealName: {
-    fontSize: 19,
-    fontWeight: 'bold',
-    color: '#2D4934',
-    flex: 1,
-    marginRight: 12,
-  },
-
-  mealPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2D4934',
-  },
-
-  mealLocation: {
-    fontSize: 14,
-    color: '#777777',
-    marginBottom: 12,
-  },
-
-  mealDescription: {
-    fontSize: 15,
-    color: '#555555',
-    lineHeight: 23,
-    marginBottom: 12,
+  multilineInput: {
+    minHeight: 110,
+    textAlignVertical: 'top',
   },
 
   detailLabel: {
@@ -2441,15 +2316,15 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 16,
     color: '#555555',
-    lineHeight: 24,
-    marginBottom: 20,
+    lineHeight: 23,
+    marginBottom: 18,
   },
 
-  noticeText: {
-    fontSize: 15,
-    color: '#777777',
-    textAlign: 'center',
-    lineHeight: 22,
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 12,
   },
 
   avatarSection: {
@@ -2461,7 +2336,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#E3EAE3',
+    backgroundColor: '#E4ECE4',
   },
 
   avatarPlaceholder: {
@@ -2470,120 +2345,151 @@ const styles = StyleSheet.create({
   },
 
   avatarInitial: {
-    fontSize: 44,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#2D4934',
   },
 
   avatarButton: {
-    marginTop: 14,
-    color: '#2D4934',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D5DDD5',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
     color: '#2D4934',
-    marginBottom: 16,
+    marginTop: 14,
   },
 
-  multilineInput: {
-    minHeight: 110,
-    textAlignVertical: 'top',
+  noticeText: {
+    color: '#777777',
+    fontSize: 14,
+    lineHeight: 21,
+    marginVertical: 12,
+    textAlign: 'center',
+  },
+
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2D4934',
+    marginVertical: 16,
+  },
+
+  mealCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E8EDE8',
   },
 
   foodImage: {
     width: '100%',
-    height: 200,
+    height: 210,
     borderRadius: 12,
     marginBottom: 16,
-    backgroundColor: '#E3EAE3',
+    backgroundColor: '#E4ECE4',
   },
 
   detailsFoodImage: {
     width: '100%',
     height: 260,
     borderRadius: 16,
-    marginBottom: 24,
-    backgroundColor: '#E3EAE3',
+    marginBottom: 20,
   },
 
   imagePlaceholder: {
-    width: '100%',
     height: 180,
-    backgroundColor: '#E3EAE3',
+    backgroundColor: '#F0F4EF',
     borderRadius: 12,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
   },
 
   placeholderEmoji: {
     fontSize: 48,
+  },
+
+  mealHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
 
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
+  mealName: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D4934',
+    marginRight: 10,
+  },
+
+  mealPrice: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D4934',
+  },
+
+  mealLocation: {
+    fontSize: 14,
+    color: '#777777',
+    marginBottom: 8,
+  },
+
+  mealDescription: {
+    fontSize: 15,
+    color: '#555555',
+    lineHeight: 22,
+    marginBottom: 10,
   },
 
   availabilityText: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 10,
   },
 
   quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 20,
+    marginVertical: 16,
   },
 
   quantityButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
     backgroundColor: '#2D4934',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   quantityButtonText: {
     color: '#FFFFFF',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
   },
 
   quantityNumber: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#2D4934',
-    minWidth: 80,
-    textAlign: 'center',
+    marginHorizontal: 28,
   },
 
   totalBox: {
-    backgroundColor: '#EAF0E8',
-    padding: 18,
+    backgroundColor: '#EDF4ED',
     borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    alignItems: 'center',
   },
 
   totalLabel: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#2D4934',
   },
@@ -2595,21 +2501,18 @@ const styles = StyleSheet.create({
   },
 
   paymentNotice: {
-    color: '#777777',
     fontSize: 14,
+    color: '#777777',
     lineHeight: 21,
-    textAlign: 'center',
-    marginBottom: 18,
+    marginVertical: 12,
   },
 
   successNotice: {
-    backgroundColor: '#DCFCE7',
-    color: '#15803D',
-    padding: 14,
-    borderRadius: 10,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#15803D',
     textAlign: 'center',
+    marginVertical: 12,
   },
 
   orderHeader: {
@@ -2619,16 +2522,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  orderDate: {
-    fontSize: 13,
-    color: '#777777',
-    marginBottom: 6,
-  },
-
   statusBadge: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
     borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
 
   statusText: {
@@ -2636,9 +2533,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  orderDate: {
+    fontSize: 13,
+    color: '#777777',
+    marginBottom: 6,
+  },
+
   divider: {
     height: 1,
-    backgroundColor: '#E8E8E8',
-    marginVertical: 16,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 14,
   },
 });
